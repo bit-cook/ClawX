@@ -29,29 +29,9 @@ function App() {
   }, [initGateway]);
   
   // Redirect to setup wizard if not complete
-  // Also check if provider keys exist - if setup was "completed" but
-  // no keys were saved (legacy bug), re-run setup
   useEffect(() => {
     if (!setupComplete && !location.pathname.startsWith('/setup')) {
       navigate('/setup');
-      return;
-    }
-    
-    // Check if we have any saved providers with keys
-    if (setupComplete && !location.pathname.startsWith('/setup')) {
-      window.electron.ipcRenderer.invoke('provider:list')
-        .then((providers: unknown) => {
-          const list = providers as Array<{ hasKey: boolean }>;
-          const hasAnyKey = Array.isArray(list) && list.some(p => p.hasKey);
-          if (!hasAnyKey) {
-            // No API keys configured - re-run setup
-            console.log('No provider API keys found, redirecting to setup');
-            navigate('/setup');
-          }
-        })
-        .catch(() => {
-          // Ignore errors
-        });
     }
   }, [setupComplete, location.pathname, navigate]);
   
