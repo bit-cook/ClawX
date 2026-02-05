@@ -197,9 +197,10 @@ export function setOpenClawDefaultModel(provider: string): void {
   }
   
   // Set the default model for the agents
+  // model must be an object: { primary: "provider/model", fallbacks?: [] }
   const agents = (config.agents || {}) as Record<string, unknown>;
   const defaults = (agents.defaults || {}) as Record<string, unknown>;
-  defaults.model = model;
+  defaults.model = { primary: model };
   agents.defaults = defaults;
   config.agents = agents;
   
