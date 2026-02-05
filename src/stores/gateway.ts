@@ -58,7 +58,17 @@ export const useGatewayStore = create<GatewayState>((set, get) => ({
       // Listen for notifications
       window.electron.ipcRenderer.on('gateway:notification', (notification) => {
         console.log('Gateway notification:', notification);
-        // Could dispatch to other stores based on notification type
+      });
+      
+      // Listen for chat events from the gateway and forward to chat store
+      window.electron.ipcRenderer.on('gateway:chat-message', (data) => {
+        const { useChatStore } = require('./chat');
+        const chatData = data as { message?: Record<string, unknown> } | Record<string, unknown>;
+        // The event payload may be nested under 'message' or directly on data
+        const event = ('message' in chatData && typeof chatData.message === 'object') 
+          ? chatData.message as Record<string, unknown>
+          : chatData as Record<string, unknown>;
+        useChatStore.getState().handleChatEvent(event);
       });
       
     } catch (error) {

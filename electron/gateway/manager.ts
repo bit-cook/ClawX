@@ -276,39 +276,48 @@ export class GatewayManager extends EventEmitter {
   }
   
   /**
-   * Check Gateway health via HTTP endpoint
+   * Check Gateway health via WebSocket ping
+   * OpenClaw Gateway doesn't have an HTTP /health endpoint
    */
   async checkHealth(): Promise<{ ok: boolean; error?: string; uptime?: number }> {
     try {
-      const response = await fetch(`http://localhost:${this.status.port}/health`, {
-        signal: AbortSignal.timeout(5000),
-      });
-      
-      if (response.ok) {
-        const data = await response.json() as { uptime?: number };
-        return { ok: true, uptime: data.uptime };
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        const uptime = this.status.connectedAt 
+          ? Math.floor((Date.now() - this.status.connectedAt) / 1000)
+          : undefined;
+        return { ok: true, uptime };
       }
-      
-      return { ok: false, error: `Health check returned ${response.status}` };
+      return { ok: false, error: 'WebSocket not connected' };
     } catch (error) {
       return { ok: false, error: String(error) };
     }
   }
   
   /**
-   * Find existing Gateway process
+   * Find existing Gateway process by attempting a WebSocket connection
    */
   private async findExistingGateway(): Promise<{ port: number } | null> {
     try {
-      // Try to connect to default port
       const port = PORTS.OPENCLAW_GATEWAY;
-      const response = await fetch(`http://localhost:${port}/health`, {
-        signal: AbortSignal.timeout(2000),
+      // Try a quick WebSocket connection to check if gateway is listening
+      return await new Promise<{ port: number } | null>((resolve) => {
+        const testWs = new WebSocket(`ws://localhost:${port}/ws`);
+        const timeout = setTimeout(() => {
+          testWs.close();
+          resolve(null);
+        }, 2000);
+        
+        testWs.on('open', () => {
+          clearTimeout(timeout);
+          testWs.close();
+          resolve({ port });
+        });
+        
+        testWs.on('error', () => {
+          clearTimeout(timeout);
+          resolve(null);
+        });
       });
-      
-      if (response.ok) {
-        return { port };
-      }
     } catch {
       // Gateway not running
     }
@@ -413,16 +422,32 @@ export class GatewayManager extends EventEmitter {
   }
   
   /**
-   * Wait for Gateway to be ready
+   * Wait for Gateway to be ready by checking if the port is accepting connections
    */
   private async waitForReady(retries = 30, interval = 1000): Promise<void> {
     for (let i = 0; i < retries; i++) {
       try {
-        const response = await fetch(`http://localhost:${this.status.port}/health`, {
-          signal: AbortSignal.timeout(1000),
+        // Try a quick WebSocket connection to see if the gateway is listening
+        const ready = await new Promise<boolean>((resolve) => {
+          const testWs = new WebSocket(`ws://localhost:${this.status.port}/ws`);
+          const timeout = setTimeout(() => {
+            testWs.close();
+            resolve(false);
+          }, 1000);
+          
+          testWs.on('open', () => {
+            clearTimeout(timeout);
+            testWs.close();
+            resolve(true);
+          });
+          
+          testWs.on('error', () => {
+            clearTimeout(timeout);
+            resolve(false);
+          });
         });
         
-        if (response.ok) {
+        if (ready) {
           return;
         }
       } catch {

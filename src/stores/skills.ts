@@ -27,18 +27,27 @@ export const useSkillsStore = create<SkillsState>((set, get) => ({
     set({ loading: true, error: null });
     
     try {
+      // OpenClaw uses skills.status to get skill information
       const result = await window.electron.ipcRenderer.invoke(
         'gateway:rpc',
-        'skills.list'
-      ) as { success: boolean; result?: Skill[]; error?: string };
+        'skills.status',
+        {}
+      ) as { success: boolean; result?: { skills?: Skill[] } | Skill[]; error?: string };
       
       if (result.success && result.result) {
-        set({ skills: result.result, loading: false });
+        // Handle both array and object response formats
+        const skills = Array.isArray(result.result) 
+          ? result.result 
+          : (result.result.skills || []);
+        set({ skills, loading: false });
       } else {
-        set({ error: result.error || 'Failed to fetch skills', loading: false });
+        // Don't show error for unsupported methods - just use empty list
+        set({ skills: [], loading: false });
       }
     } catch (error) {
-      set({ error: String(error), loading: false });
+      // Gateway might not support this method yet - gracefully degrade
+      console.warn('Failed to fetch skills:', error);
+      set({ skills: [], loading: false });
     }
   },
   
