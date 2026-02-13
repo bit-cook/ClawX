@@ -2,6 +2,7 @@
     "title": "定时任务",
     "subtitle": "通过定时任务自动化 AI 工作流",
     "newTask": "新建任务",
+    "refresh": "刷新",
     "gatewayWarning": "网关未运行。没有活跃的网关，无法管理定时任务。",
     "stats": {
         "total": "任务总数",
